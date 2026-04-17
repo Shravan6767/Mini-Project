@@ -41,9 +41,10 @@ else:
 # --- Gemini Configuration ---
 GEMINI_API_KEY = os.getenv("GEMINI_KEY")
 if GEMINI_API_KEY:
+    # Initial global configuration
     genai.configure(api_key=GEMINI_API_KEY)
 else:
-    print("CRITICAL: GEMINI_KEY environment variable is missing!")
+    print("WARNING: GEMINI_KEY is missing!")
 
 UPLOAD_FOLDER = "static/uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
@@ -79,7 +80,13 @@ def upload():
         Advice: <One short farming tip>
         """
 
-        response = model.generate_content([prompt, img])
+        # FIX: Explicitly passing the API key in request_options 
+        # to prevent the 401 "Expected OAuth 2" error.
+        response = model.generate_content(
+            [prompt, img],
+            request_options={"api_key": GEMINI_API_KEY}
+        )
+        
         output = response.text.strip().replace("*", "")
 
         fertilizers = [
@@ -120,6 +127,8 @@ def upload():
         return render_template("result.html", image=filepath, result=analysis)
 
     except Exception as e:
+        # Prints the specific error to Render logs for easier debugging
+        print(f"Detailed AI Error: {str(e)}")
         return f"AI Error: {str(e)}"
 
 # ===================== ADMIN SYSTEM =====================
