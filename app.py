@@ -1,12 +1,11 @@
 print("APP STARTING...")
 
 import os
-import requests
 import random
 from flask import Flask, render_template, request, redirect, session, flash
 from dotenv import load_dotenv
 from pymongo import MongoClient
-from google import genai  # Ensure you use 'pip install google-genai'
+from google import genai 
 from PIL import Image
 from werkzeug.utils import secure_filename
 
@@ -14,18 +13,15 @@ from werkzeug.utils import secure_filename
 load_dotenv() 
 
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET", "secret123")
+app.secret_key = os.getenv("FLASK_SECRET", "farm_secret_789")
 
 # --- MongoDB Connection ---
 MONGO_URI = os.getenv("MONGO_URI")
+users = None
 
-if not MONGO_URI:
-    print("CRITICAL ERROR: MONGO_URI is not set!")
-    client_db = None
-    users = None
-else:
+if MONGO_URI:
     try:
-        # standard connection with a 5-second timeout
+        # 5-second timeout to prevent the app from hanging if DB is down
         client_db = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
         db = client_db.farm_database
         users = db.users
@@ -33,33 +29,54 @@ else:
         print("MongoDB Connected Successfully!")
     except Exception as e:
         print(f"MongoDB Connection Error: {e}")
-        client_db = None
-        users = None
+else:
+    print("CRITICAL: MONGO_URI missing from environment variables!")
 
-# --- Gemini Configuration (Final OAuth Fix) ---
+# --- Gemini Configuration (OAuth 2 Fix) ---
 GEMINI_API_KEY = os.getenv("GEMINI_KEY")
+client_ai = None
 
 if GEMINI_API_KEY:
-    # CRITICAL FIX: vertexai=False prevents the 401 OAuth 2 error
-    # It tells the SDK to use the Developer API key directly.
-    client_ai = genai.Client(
-        api_key=GEMINI_API_KEY,
-        vertexai=False
-    )
-    print("Gemini Client initialized (Developer Mode).")
-else:
-    print("WARNING: GEMINI_KEY is missing!")
-    client_ai = None
+    # vertexai=False ensures we use the API key directly (Developer Mode)
+    client_ai = genai.Client(api_key=GEMINI_API_KEY, vertexai=False)
+    print("Gemini AI Client Ready.")
 
 UPLOAD_FOLDER = "static/uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# ===================== ROUTES =====================
+# ===================== NAVIGATION ROUTES =====================
 
 @app.route('/')
 def home():
     return render_template('index.html')
+
+@app.route('/about')
+def about():
+    return render_template('about.html')
+
+@app.route('/schemes')
+def schemes():
+    # Example schemes data; you can also fetch this from MongoDB
+    farm_schemes = [
+        {"name": "PM-Kisan", "detail": "Direct income support of ₹6,000/year."},
+        {"name": "Crop Insurance", "detail": "Protection against natural calamities."},
+        {"name": "Soil Health Card", "detail": "Free soil testing and nutrient advice."}
+    ]
+    return render_template('schemes.html', schemes=farm_schemes)
+
+@app.route('/contact', methods=['GET', 'POST'])
+def contact():
+    if request.method == 'POST':
+        name = request.form.get('name')
+        message = request.form.get('message')
+        # Saving messages to a local file for admin to see
+        with open("messages.txt", "a") as f:
+            f.write(f"{name}|{message}\n")
+        return render_template("contact.html", success=True)
+    return render_template("contact.html")
+
+# ===================== AI UPLOAD SYSTEM =====================
 
 @app.route('/upload', methods=['POST'])
 def upload():
@@ -71,122 +88,74 @@ def upload():
     filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
     file.save(filepath)
 
+    if not client_ai:
+        return "AI Error: API Key not configured."
+
     try:
         img = Image.open(filepath)
-        
-        prompt = """
-        Analyze this agricultural image. 
-        If it's NOT a crop/plant, respond ONLY with: NOT_CROP
-        If it IS a crop, respond strictly in this format:
-        Crop: <name of crop>
-        Condition: <Describe health in 3-5 words>
-        Advice: <One short farming tip>
-        """
+        prompt = "Analyze this agricultural image. Identify the crop and condition. Respond with 'Crop: [name]', 'Condition: [status]', and 'Advice: [tip]'."
 
-        # Using the correct 2026 contents syntax
         response = client_ai.models.generate_content(
             model="gemini-2.5-flash-lite",
             contents=[prompt, img]
         )
         
         output = response.text.strip().replace("*", "")
-
-        fertilizers = [
-            "NPK 19-19-19", "Urea (46% Nitrogen)", "DAP (Diammonium Phosphate)", 
-            "Organic Neem Cake", "Potash (MOP)", "Ammonium Sulphate", 
-            "Compost Manure", "Zinc Sulphate"
-        ]
         
-        analysis = {
-            "health": "N/A",
-            "condition": "N/A",
-            "fertilizer": random.choice(fertilizers),
-            "harvest": f"{random.randint(75, 98)}%"
-        }
+        # Default analysis values
+        analysis = {"health": "Unknown", "condition": "Processing Error", "fertilizer": "N/A", "harvest": "N/A"}
 
-        if "NOT_CROP" in output.upper():
-            analysis = {
-                "health": "Invalid Image",
-                "condition": "Please upload a crop image",
-                "fertilizer": "None",
-                "harvest": "0%"
-            }
-        else:
-            lines = output.split('\n')
-            for line in lines:
-                if ":" in line:
-                    parts = line.split(":", 1)
-                    k = parts[0].lower()
-                    v = parts[1].strip()
-                    if "crop" in k:
-                        analysis["health"] = v
-                    elif "condition" in k:
-                        analysis["condition"] = v
-                    elif "advice" in k:
-                        analysis["harvest"] = f"{analysis['harvest']} - {v}"
+        # Parsing logic for AI response
+        lines = output.split('\n')
+        for line in lines:
+            if ":" in line:
+                key, val = line.split(":", 1)
+                k = key.lower()
+                if "crop" in k: analysis["health"] = val.strip()
+                elif "condition" in k: analysis["condition"] = val.strip()
+                elif "advice" in k: analysis["harvest"] = val.strip()
 
         return render_template("result.html", image=filepath, result=analysis)
-
     except Exception as e:
-        print(f"Detailed Error: {str(e)}")
         return f"AI Error: {str(e)}"
 
-# ===================== USER/ADMIN SYSTEM =====================
+# ===================== USER AUTH SYSTEM =====================
 
-@app.route('/admin', methods=['GET', 'POST'])
-def admin_login():
-    if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password')
-        if email == "admin@farmday.com" and password == "1234":
-            session['admin'] = True
-            return redirect('/dashboard')
-        return render_template("admin_login.html", error="Invalid Credentials")
-    return render_template("admin_login.html")
-
-@app.route('/dashboard')
-def dashboard():
-    if not session.get('admin'):
-        return redirect('/admin')
-    messages = []
-    if os.path.exists("messages.txt"):
-        with open("messages.txt", "r") as f:
-            for line in f:
-                parts = line.strip().split("|")
-                if len(parts) >= 2:
-                    messages.append({"name": parts[0], "message": parts[1]})
-    return render_template("dashboard.html", messages=messages)
-
-@app.route('/create_account', methods=['POST'])
-def create_account():
-    email = request.form.get('email', '').strip()
-    username = request.form.get('username', '').strip()
-    password = request.form.get('password', '').strip()
-    if not users:
-        flash("DB Offline")
-        return redirect('/user')
-    try:
-        if users.find_one({"email": email}):
-            flash("Email exists")
-            return redirect('/user')
-        users.insert_one({"email": email, "username": username, "password": password})
-        flash("Account Created")
-    except Exception as e:
-        flash("Error")
-    return redirect('/user')
+@app.route('/user')
+def user_page():
+    return render_template("user_login.html")
 
 @app.route('/login', methods=['POST'])
 def login():
+    if not users:
+        return "DB offline: Please check MongoDB Network Access/Whitelist."
+    
     email = request.form.get('email', '').strip()
     password = request.form.get('password', '').strip()
-    if not users:
-        flash("DB Offline")
-        return redirect('/user')
     user = users.find_one({"email": email, "password": password})
+
     if user:
         session['user'] = user['username']
         return redirect('/user_dashboard')
-    flash("Invalid Login")
+    
+    flash("Invalid Login Details")
+    return redirect('/user')
+
+@app.route('/create_account', methods=['POST'])
+def create_account():
+    if not users:
+        return "DB offline: Cannot create account right now."
+    
+    email = request.form.get('email', '').strip()
+    username = request.form.get('username', '').strip()
+    password = request.form.get('password', '').strip()
+
+    if users.find_one({"email": email}):
+        flash("Email already registered")
+        return redirect('/user')
+
+    users.insert_one({"email": email, "username": username, "password": password})
+    flash("Account Created Successfully!")
     return redirect('/user')
 
 @app.route('/user_dashboard')
@@ -195,28 +164,12 @@ def user_dashboard():
         return render_template("user_dashboard.html", user=session['user'])
     return redirect('/user')
 
-@app.route('/user')
-def user_page():
-    return render_template("user_login.html")
-
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect('/')
 
-@app.context_processor
-def inject_user():
-    return dict(current_user=session.get('user'))
-
-@app.route('/contact', methods=['GET', 'POST'])
-def contact():
-    if request.method == 'POST':
-        name = request.form.get('name')
-        message = request.form.get('message')
-        with open("messages.txt", "a") as f:
-            f.write(f"{name}|{message}|\n")
-        return render_template("contact.html", success=True)
-    return render_template("contact.html")
+# ===================== RUN APP =====================
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5002))
