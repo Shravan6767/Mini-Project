@@ -6,7 +6,7 @@ import random
 from flask import Flask, render_template, request, redirect, session, flash
 from dotenv import load_dotenv
 from pymongo import MongoClient
-from google import genai  # Modern 2026 SDK
+from google import genai  # Ensure you use 'pip install google-genai'
 from PIL import Image
 from werkzeug.utils import secure_filename
 
@@ -25,6 +25,7 @@ if not MONGO_URI:
     users = None
 else:
     try:
+        # standard connection with a 5-second timeout
         client_db = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
         db = client_db.farm_database
         users = db.users
@@ -35,11 +36,17 @@ else:
         client_db = None
         users = None
 
-# --- Gemini Configuration (Modern Client Style) ---
+# --- Gemini Configuration (Final OAuth Fix) ---
 GEMINI_API_KEY = os.getenv("GEMINI_KEY")
+
 if GEMINI_API_KEY:
-    # This Client structure handles the AQ. key format correctly
-    client_ai = genai.Client(api_key=GEMINI_API_KEY)
+    # CRITICAL FIX: vertexai=False prevents the 401 OAuth 2 error
+    # It tells the SDK to use the Developer API key directly.
+    client_ai = genai.Client(
+        api_key=GEMINI_API_KEY,
+        vertexai=False
+    )
+    print("Gemini Client initialized (Developer Mode).")
 else:
     print("WARNING: GEMINI_KEY is missing!")
     client_ai = None
@@ -76,7 +83,7 @@ def upload():
         Advice: <One short farming tip>
         """
 
-        # Using the new contents-based generation for 2026
+        # Using the correct 2026 contents syntax
         response = client_ai.models.generate_content(
             model="gemini-2.5-flash-lite",
             contents=[prompt, img]
@@ -108,9 +115,9 @@ def upload():
             lines = output.split('\n')
             for line in lines:
                 if ":" in line:
-                    key, value = line.split(":", 1)
-                    k = key.lower()
-                    v = value.strip()
+                    parts = line.split(":", 1)
+                    k = parts[0].lower()
+                    v = parts[1].strip()
                     if "crop" in k:
                         analysis["health"] = v
                     elif "condition" in k:
@@ -121,17 +128,16 @@ def upload():
         return render_template("result.html", image=filepath, result=analysis)
 
     except Exception as e:
-        print(f"AI Error Logs: {str(e)}")
+        print(f"Detailed Error: {str(e)}")
         return f"AI Error: {str(e)}"
 
-# ===================== ADMIN SYSTEM =====================
+# ===================== USER/ADMIN SYSTEM =====================
 
 @app.route('/admin', methods=['GET', 'POST'])
 def admin_login():
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
-
         if email == "admin@farmday.com" and password == "1234":
             session['admin'] = True
             return redirect('/dashboard')
@@ -142,7 +148,6 @@ def admin_login():
 def dashboard():
     if not session.get('admin'):
         return redirect('/admin')
-
     messages = []
     if os.path.exists("messages.txt"):
         with open("messages.txt", "r") as f:
@@ -152,47 +157,36 @@ def dashboard():
                     messages.append({"name": parts[0], "message": parts[1]})
     return render_template("dashboard.html", messages=messages)
 
-# ===================== USER SYSTEM =====================
-
 @app.route('/create_account', methods=['POST'])
 def create_account():
     email = request.form.get('email', '').strip()
     username = request.form.get('username', '').strip()
     password = request.form.get('password', '').strip()
-
     if not users:
-        flash("Database offline.")
+        flash("DB Offline")
         return redirect('/user')
-
     try:
         if users.find_one({"email": email}):
-            flash("Email already registered")
+            flash("Email exists")
             return redirect('/user')
-            
         users.insert_one({"email": email, "username": username, "password": password})
-        flash("Account Created Successfully")
+        flash("Account Created")
     except Exception as e:
-        flash("Error creating account.")
-        print(f"Signup Error: {e}")
-
+        flash("Error")
     return redirect('/user')
 
 @app.route('/login', methods=['POST'])
 def login():
     email = request.form.get('email', '').strip()
     password = request.form.get('password', '').strip()
-
     if not users:
-        flash("Database offline.")
+        flash("DB Offline")
         return redirect('/user')
-
     user = users.find_one({"email": email, "password": password})
-
     if user:
         session['user'] = user['username']
         return redirect('/user_dashboard')
-
-    flash("Invalid Login Details")
+    flash("Invalid Login")
     return redirect('/user')
 
 @app.route('/user_dashboard')
@@ -204,8 +198,6 @@ def user_dashboard():
 @app.route('/user')
 def user_page():
     return render_template("user_login.html")
-
-# ===================== HELPERS =====================
 
 @app.route('/logout')
 def logout():
