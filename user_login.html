@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>User Login</title>
+    <link rel="stylesheet" href="/static/style.css">
+
+    <style>
+        body {
+            font-family: Arial;
+            background: #f4f6f9;
+            text-align: center;
+        }
+
+        .box {
+            width: 350px;
+            margin: 80px auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        button {
+            padding: 10px;
+            width: 100%;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+
+        input {
+            width: 95%;
+            padding: 10px;
+            margin: 5px 0;
+        }
+
+        .hidden { display: none; }
+
+        .tick {
+            font-size: 12px;
+            text-align: left;
+            color: red;
+        }
+
+        .ok { color: green; }
+
+        #flash-box {
+            background: #4CAF50;
+            color: white;
+            padding: 10px;
+            margin: 10px auto;
+            width: 250px;
+            border-radius: 8px;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- ✅ FLASH MESSAGE (FIXED) -->
+{% with messages = get_flashed_messages() %}
+    {% if messages %}
+        {% for msg in messages %}
+            <div id="flash-box">
+                {{ msg }}
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<div class="box">
+
+    <h2>User Access</h2>
+
+    <button onclick="showCreate()">Create Account</button>
+    <button onclick="showLogin()">Login</button>
+
+    <!-- CREATE ACCOUNT -->
+    <form id="createForm" class="hidden" method="POST" action="/create_account">
+
+        <input type="email" name="email" placeholder="Enter Email" required>
+        <input type="text" name="username" placeholder="Enter Username" required>
+
+        <input type="password" id="password" name="password" placeholder="Create Password" required onkeyup="checkPass()">
+
+        <div class="tick" id="len">❌ More than 7 characters</div>
+        <div class="tick" id="cap">❌ 1 capital letter</div>
+        <div class="tick" id="spc">❌ 1 special character</div>
+
+        <button type="submit">Create Account</button>
+    </form>
+
+    <!-- LOGIN -->
+    <form id="loginForm" class="hidden" method="POST" action="/login">
+
+        <input type="email" name="email" placeholder="Enter Email" required>
+        <input type="password" name="password" placeholder="Enter Password" required>
+
+        <button type="submit">Login</button>
+    </form>
+
+</div>
+
+<script>
+function showCreate() {
+    document.getElementById("createForm").style.display = "block";
+    document.getElementById("loginForm").style.display = "none";
+}
+
+function showLogin() {
+    document.getElementById("loginForm").style.display = "block";
+    document.getElementById("createForm").style.display = "none";
+}
+
+function checkPass() {
+    let p = document.getElementById("password").value;
+
+    document.getElementById("len").className = p.length > 7 ? "tick ok" : "tick";
+    document.getElementById("cap").className = /[A-Z]/.test(p) ? "tick ok" : "tick";
+    document.getElementById("spc").className = /[!@#$%^&*]/.test(p) ? "tick ok" : "tick";
+}
+</script>
+
+</body>
+</html>

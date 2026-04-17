@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<h1 style="text-align:center;">📊 Admin Dashboard</h1>
+
+{% if messages %}
+    {% for name, message in messages %}
+        <div class="card">
+            <p><b>Name:</b> {{ name }}</p>
+            <p><b>Message:</b> {{ message }}</p>
+
+            <form onsubmit="sendReply(event)">
+                <input type="text" placeholder="Type reply..." required><br><br>
+                <button type="submit">Send Reply</button>
+            </form>
+        </div>
+    {% endfor %}
+{% else %}
+    <p style="text-align:center;">No messages found</p>
+{% endif %}
+
+<!-- POPUP -->
+<div id="popup" style="display:none; position:fixed; bottom:20px; right:20px; background:green; color:white; padding:10px; border-radius:8px;">
+    ✅ Reply Sent Successfully!
+</div>
+
+<script>
+function sendReply(event) {
+    event.preventDefault();
+
+    const popup = document.getElementById("popup");
+    popup.style.display = "block";
+
+    setTimeout(() => {
+        popup.style.display = "none";
+    }, 2000);
+}
+</script>
+
+</body>
+</html>

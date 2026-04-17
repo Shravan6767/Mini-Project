@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>User Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background: #f4f6f9;
+        }
+
+        /* Top Bar */
+        .navbar {
+            background: #2e7d32;
+            color: white;
+            padding: 15px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .navbar h2 {
+            margin: 0;
+        }
+
+        .container {
+            padding: 20px;
+        }
+
+        /* Welcome Card */
+        .welcome-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        /* Message Cards */
+        .message-card {
+            background: white;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 10px;
+            border-left: 5px solid #2e7d32;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+        }
+
+        .msg-title {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .reply {
+            margin-top: 8px;
+            color: #555;
+        }
+
+        .empty {
+            text-align: center;
+            color: gray;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <nav>
+  <a href="/">Home</a>
+  <a href="/about">About</a>
+  <a href="/schemes">Schemes</a>
+  <a href="/contact">Contact</a>
+  <a href="/admin">Admin</a>
+</nav>
+
+<!-- NAVBAR -->
+<div class="navbar">
+    <h2>Farm Easy</h2>
+    <div>User Panel</div>
+</div>
+
+<div class="container">
+
+    <!-- WELCOME -->
+    <div class="welcome-card">
+        <h2>Welcome, {{ user }} 👋</h2>
+        <p>Here are your latest messages and updates.</p>
+    </div>
+
+    <!-- MESSAGES -->
+    <h3>Your Messages</h3>
+
+    {% if messages %}
+        {% for msg, rep in messages %}
+            <div class="message-card">
+                <div class="msg-title">Message</div>
+                <div>{{ msg }}</div>
+
+                <div class="reply">
+                    <b>Reply:</b> {{ rep if rep else "No reply yet" }}
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p class="empty">No messages found</p>
+    {% endif %}
+
+</div>
+
+</body>
+</html>

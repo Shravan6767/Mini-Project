@@ -1,0 +1,71 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Contact</title>
+    <link rel="stylesheet" href="/static/style.css">
+
+<style>
+.popup{
+    position:fixed;
+    top:20px;
+    right:20px;
+    background:#2e7d32;
+    color:white;
+    padding:15px 25px;
+    border-radius:10px;
+    box-shadow:0 5px 15px rgba(0,0,0,0.2);
+    display:none;
+    z-index:9999;
+    font-size:16px;
+}
+</style>
+
+</head>
+<body>
+
+<nav style="background: green; padding: 15px; display: flex; gap: 15px;">
+    <a href="/" style="color:white;">Home</a>
+    <a href="/about" style="color:white;">About</a>
+    <a href="/schemes" style="color:white;">Schemes</a>
+    <a href="/contact" style="color:white;">Contact</a>
+</nav>
+
+<div class="hero">
+    <h1>📞 Contact Us</h1>
+    <p>We’d love to hear from you</p>
+</div>
+
+<div class="card">
+    <h2>Send a Message</h2>
+
+    <form id="contactForm" action="/contact" method="POST">
+        <input type="text" name="name" placeholder="Your Name" required><br><br>
+
+        <textarea name="message" placeholder="Your Message" required></textarea><br><br>
+
+        <button type="submit">Send Message</button>
+    </form>
+</div>
+
+<div id="popup" class="popup">
+✅ Message Sent Successfully!
+</div>
+
+<script>
+document.getElementById("contactForm").addEventListener("submit", function(e){
+
+    e.preventDefault(); // stop immediate submit
+
+    document.getElementById("popup").style.display = "block";
+
+    setTimeout(() => {
+        this.submit(); // submit after popup shows
+    }, 2000);
+
+});
+</script>
+
+</body>
+</html>
+```

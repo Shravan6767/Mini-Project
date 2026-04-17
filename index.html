@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <title>AI Crop Advisor</title>
+   <link rel="stylesheet" href="/static/style.css">
+   
+</head>
+<body>
+    
+<nav style="background: green; padding: 15px; display: flex; align-items: center; gap: 15px;">
+    <a href="/" style="color:white; text-decoration: none;">Home</a>
+    <a href="/about" style="color:white; text-decoration: none;">About</a>
+    <a href="/schemes" style="color:white; text-decoration: none;">Schemes</a>
+    <a href="/contact" style="color:white; text-decoration: none;">Contact</a>
+    <a href="/admin" style="color:white; text-decoration: none;">Admin</a>
+
+    {% if user %}
+        <a href="/user_dashboard" style="color:white; text-decoration: none;">Dashboard</a>
+        <a href="/logout" style="color:white; text-decoration: none;">Logout</a>
+    {% else %}
+        <a href="/user" style="color:white; text-decoration: none;">Login</a>
+    {% endif %}
+</nav>
+
+<div class="hero">
+    <h1>🌾 AI Crop Advisor</h1>
+    <p>Smart farming powered by AI insights</p>
+    
+    <img src="/static/images/farm.jpg">
+</div>
+
+<div class="card">
+    <h2>Upload Crop Image</h2>
+
+    
+<form action="/upload" method="POST" enctype="multipart/form-data">
+    <input type="file" name="image" required>
+    <button type="submit">Analyze</button>
+</form>
+
+
+</div>
+
+
+</div>
+</body>
+
+</html>

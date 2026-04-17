@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <title>Result</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<nav style="background: green; padding: 15px; display: flex; align-items: center; gap: 15px;">
+    <a href="/" style="color:white; text-decoration: none;">Home</a>
+    <a href="/about" style="color:white; text-decoration: none;">About</a>
+    <a href="/schemes" style="color:white; text-decoration: none;">Schemes</a>
+    <a href="/contact" style="color:white; text-decoration: none;">Contact</a>
+    <a href="/admin" style="color:white; text-decoration: none;">Admin</a>
+
+    {% if user %}
+        <a href="/user_dashboard" style="color:white; text-decoration: none;">Dashboard</a>
+        <a href="/logout" style="color:white; text-decoration: none;">Logout</a>
+    {% else %}
+        <a href="/user" style="color:white; text-decoration: none;">Login</a>
+    {% endif %}
+</nav>
+
+<div class="hero">
+    <h1>🌿 Crop Analysis</h1>
+    <h1 style="color:red;">FINAL RESULT</h1>
+</div>
+
+<div class="card">
+    
+<h2>Analysis Result</h2>
+
+<img src="/{{ image }}" width="300"><br><br>
+
+<p><b>Crop Identified:</b> {{ result.health }}</p>
+<p><b>Current Condition:</b> {{ result.condition }}</p>
+<p><b>Recommended Fertilizer:</b> {{ result.fertilizer }}</p>
+<p><b>Health Score & Advice:</b> {{ result.harvest }}</p>
+
+
+</div>
+
+</body>
+</html>
