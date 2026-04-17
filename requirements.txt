@@ -1,7 +1,6 @@
-Flask
-google-generativeai
+flask
+pymongo[srv]
+google-genai
 Pillow
 python-dotenv
-pymongo[srv]
 gunicorn
-werkzeug
