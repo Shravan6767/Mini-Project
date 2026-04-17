@@ -6,7 +6,7 @@ import random
 from flask import Flask, render_template, request, redirect, session, flash
 from dotenv import load_dotenv
 from pymongo import MongoClient
-import google.generativeai as genai
+from google import genai  # Modern 2026 SDK
 from PIL import Image
 from werkzeug.utils import secure_filename
 
@@ -14,37 +14,35 @@ from werkzeug.utils import secure_filename
 load_dotenv() 
 
 app = Flask(__name__)
-# Use an environment variable for the secret key if available
 app.secret_key = os.getenv("FLASK_SECRET", "secret123")
 
-# --- Robust MongoDB Connection ---
+# --- MongoDB Connection ---
 MONGO_URI = os.getenv("MONGO_URI")
 
 if not MONGO_URI:
-    print("CRITICAL ERROR: MONGO_URI is not set in Environment Variables!")
-    client = None
+    print("CRITICAL ERROR: MONGO_URI is not set!")
+    client_db = None
     users = None
 else:
     try:
-        # Added serverSelectionTimeoutMS to prevent long hangs on bad URIs
-        client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
-        db = client.farm_database
+        client_db = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+        db = client_db.farm_database
         users = db.users
-        # Trigger a ping to verify connection immediately
-        client.admin.command('ping')
+        client_db.admin.command('ping')
         print("MongoDB Connected Successfully!")
     except Exception as e:
         print(f"MongoDB Connection Error: {e}")
-        client = None
+        client_db = None
         users = None
 
-# --- Gemini Configuration ---
+# --- Gemini Configuration (Modern Client Style) ---
 GEMINI_API_KEY = os.getenv("GEMINI_KEY")
 if GEMINI_API_KEY:
-    # Initial global configuration
-    genai.configure(api_key=GEMINI_API_KEY)
+    # This Client structure handles the AQ. key format correctly
+    client_ai = genai.Client(api_key=GEMINI_API_KEY)
 else:
     print("WARNING: GEMINI_KEY is missing!")
+    client_ai = None
 
 UPLOAD_FOLDER = "static/uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
@@ -68,9 +66,7 @@ def upload():
 
     try:
         img = Image.open(filepath)
-        # Using the current stable 2026 lite model
-        model = genai.GenerativeModel("gemini-2.5-flash-lite")
-
+        
         prompt = """
         Analyze this agricultural image. 
         If it's NOT a crop/plant, respond ONLY with: NOT_CROP
@@ -80,11 +76,10 @@ def upload():
         Advice: <One short farming tip>
         """
 
-        # FIX: Explicitly passing the API key in request_options 
-        # to prevent the 401 "Expected OAuth 2" error.
-        response = model.generate_content(
-            [prompt, img],
-            request_options={"api_key": GEMINI_API_KEY}
+        # Using the new contents-based generation for 2026
+        response = client_ai.models.generate_content(
+            model="gemini-2.5-flash-lite",
+            contents=[prompt, img]
         )
         
         output = response.text.strip().replace("*", "")
@@ -121,14 +116,12 @@ def upload():
                     elif "condition" in k:
                         analysis["condition"] = v
                     elif "advice" in k:
-                        # Combine random health % with AI advice
                         analysis["harvest"] = f"{analysis['harvest']} - {v}"
 
         return render_template("result.html", image=filepath, result=analysis)
 
     except Exception as e:
-        # Prints the specific error to Render logs for easier debugging
-        print(f"Detailed AI Error: {str(e)}")
+        print(f"AI Error Logs: {str(e)}")
         return f"AI Error: {str(e)}"
 
 # ===================== ADMIN SYSTEM =====================
@@ -168,7 +161,7 @@ def create_account():
     password = request.form.get('password', '').strip()
 
     if not users:
-        flash("Database connection error. Try again later.")
+        flash("Database offline.")
         return redirect('/user')
 
     try:
@@ -176,11 +169,7 @@ def create_account():
             flash("Email already registered")
             return redirect('/user')
             
-        users.insert_one({
-            "email": email, 
-            "username": username, 
-            "password": password
-        })
+        users.insert_one({"email": email, "username": username, "password": password})
         flash("Account Created Successfully")
     except Exception as e:
         flash("Error creating account.")
@@ -194,7 +183,7 @@ def login():
     password = request.form.get('password', '').strip()
 
     if not users:
-        flash("Database connection error.")
+        flash("Database offline.")
         return redirect('/user')
 
     user = users.find_one({"email": email, "password": password})
@@ -238,6 +227,5 @@ def contact():
     return render_template("contact.html")
 
 if __name__ == "__main__":
-    # Render uses the PORT environment variable
     port = int(os.environ.get("PORT", 5002))
     app.run(host='0.0.0.0', port=port, debug=True)
