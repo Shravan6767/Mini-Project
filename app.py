@@ -43,7 +43,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_KEY")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 else:
-    print("WARNING: GEMINI_KEY is missing!")
+    print("CRITICAL: GEMINI_KEY environment variable is missing!")
 
 UPLOAD_FOLDER = "static/uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
