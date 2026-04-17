@@ -11,21 +11,39 @@ from PIL import Image
 from werkzeug.utils import secure_filename
 
 # ===================== CONFIGURATION =====================
-load_dotenv() # Moved to the top to ensure variables load first
+load_dotenv() 
 
 app = Flask(__name__)
+# Use an environment variable for the secret key if available
 app.secret_key = os.getenv("FLASK_SECRET", "secret123")
 
-# MongoDB Connection
+# --- Robust MongoDB Connection ---
 MONGO_URI = os.getenv("MONGO_URI")
-client = MongoClient(MONGO_URI)
-db = client.farm_database
-# Using 'users' to match your route logic
-users = db.users 
 
-# Gemini Configuration
-GEMINI_API_KEY = os.getenv("GEMINI_KEY", "AQ.Ab8RN6LpjKkqpkGJ-DRR_sSCtb1zPWV_gKehm-OBXkh7xkrMJQ")
-genai.configure(api_key=GEMINI_API_KEY)
+if not MONGO_URI:
+    print("CRITICAL ERROR: MONGO_URI is not set in Environment Variables!")
+    client = None
+    users = None
+else:
+    try:
+        # Added serverSelectionTimeoutMS to prevent long hangs on bad URIs
+        client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+        db = client.farm_database
+        users = db.users
+        # Trigger a ping to verify connection immediately
+        client.admin.command('ping')
+        print("MongoDB Connected Successfully!")
+    except Exception as e:
+        print(f"MongoDB Connection Error: {e}")
+        client = None
+        users = None
+
+# --- Gemini Configuration ---
+GEMINI_API_KEY = os.getenv("GEMINI_KEY")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+else:
+    print("WARNING: GEMINI_KEY is missing!")
 
 UPLOAD_FOLDER = "static/uploads"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
@@ -43,11 +61,13 @@ def upload():
     if not file or file.filename == "":
         return "No file selected"
 
-    filepath = os.path.join(app.config["UPLOAD_FOLDER"], secure_filename(file.filename))
+    filename = secure_filename(file.filename)
+    filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
     file.save(filepath)
 
     try:
         img = Image.open(filepath)
+        # Using the current stable 2026 lite model
         model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
         prompt = """
@@ -94,6 +114,7 @@ def upload():
                     elif "condition" in k:
                         analysis["condition"] = v
                     elif "advice" in k:
+                        # Combine random health % with AI advice
                         analysis["harvest"] = f"{analysis['harvest']} - {v}"
 
         return render_template("result.html", image=filepath, result=analysis)
@@ -137,8 +158,11 @@ def create_account():
     username = request.form.get('username', '').strip()
     password = request.form.get('password', '').strip()
 
+    if not users:
+        flash("Database connection error. Try again later.")
+        return redirect('/user')
+
     try:
-        # Check if user already exists
         if users.find_one({"email": email}):
             flash("Email already registered")
             return redirect('/user')
@@ -159,6 +183,10 @@ def create_account():
 def login():
     email = request.form.get('email', '').strip()
     password = request.form.get('password', '').strip()
+
+    if not users:
+        flash("Database connection error.")
+        return redirect('/user')
 
     user = users.find_one({"email": email, "password": password})
 
@@ -201,5 +229,6 @@ def contact():
     return render_template("contact.html")
 
 if __name__ == "__main__":
-    # Removed use_reloader=False for easier local development
-    app.run(debug=True, port=5002)
+    # Render uses the PORT environment variable
+    port = int(os.environ.get("PORT", 5002))
+    app.run(host='0.0.0.0', port=port, debug=True)
